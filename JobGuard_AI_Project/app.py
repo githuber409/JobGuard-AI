@@ -90,36 +90,53 @@ def warning_signals(text):
 with st.sidebar:
     st.header("Project controls")
     st.write("Choose how the model gets its training data.")
-    source = st.radio("Training source", ["Built-in demo examples", "Upload a CSV dataset"])
+    source = st.radio(
+    "Training source",
+    ["Full dataset on server", "Built-in demo examples", "Upload a CSV dataset"],
+)
     uploaded = None
-    if source == "Upload a CSV dataset":
-        uploaded = st.file_uploader("Upload labelled job-postings CSV", type=["csv"])
-        st.caption("Expected label column: `fraudulent` (0 = legitimate, 1 = fake).")
-    st.divider()
-    st.caption("Libraries: Streamlit, pandas, NumPy, scikit-learn, Matplotlib.")
 
-
-if source == "Built-in demo examples":
-    df = get_demo_data()
-    data_label = "small illustrative demo set"
-else:
+if source == "Full dataset on server":
     import os
 
     local_csv = "fake_job_postings.csv"
 
+    if not os.path.exists(local_csv):
+        st.error("Dataset file not found on the server.")
+        st.stop()
+
     try:
-        if uploaded is not None:
-            df = pd.read_csv(uploaded)
-            data_label = "uploaded dataset"
-        elif os.path.exists(local_csv):
-            df = pd.read_csv(local_csv)
-            data_label = "full JobGuard AI dataset"
-        else:
-            st.info(
-                "Upload a labelled CSV in the sidebar to use "
-                "your own dataset. Built-in demo mode is also available."
-            )
-            st.stop()
+        df = pd.read_csv(local_csv)
+    except Exception as e:
+        st.error(f"Could not read CSV: {e}")
+        st.stop()
+
+    if "fraudulent" not in df.columns:
+        st.error("The CSV needs a `fraudulent` column.")
+        st.stop()
+
+    df["fraudulent"] = pd.to_numeric(
+        df["fraudulent"], errors="coerce"
+    )
+    df = df[df["fraudulent"].isin([0, 1])].copy()
+
+    if len(df) < 10 or df["fraudulent"].nunique() < 2:
+        st.error("The dataset must contain at least 10 labelled rows with both classes.")
+        st.stop()
+
+    data_label = "full JobGuard AI dataset"
+
+elif source == "Built-in demo examples":
+    df = get_demo_data()
+    data_label = "small illustrative demo set"
+
+else:
+    if uploaded is None:
+        st.info("Upload a labelled CSV to train the model on your dataset.")
+        st.stop()
+
+    try:
+        df = pd.read_csv(uploaded)
     except Exception as e:
         st.error(f"Could not read CSV: {e}")
         st.stop()
@@ -134,15 +151,10 @@ else:
     df = df[df["fraudulent"].isin([0, 1])].copy()
 
     if len(df) < 10 or df["fraudulent"].nunique() < 2:
-        st.error(
-            "Please upload at least 10 labelled rows containing both classes (0 and 1)."
-        )
+        st.error("Please upload at least 10 labelled rows containing both classes (0 and 1).")
         st.stop()
 
-    if uploaded is not None:
-        data_label = "uploaded dataset"
-    else:
-        data_label = "full JobGuard AI dataset"
+    data_label = "uploaded dataset"
 
 
 texts = combine_fields(df).map(normalize_text)
