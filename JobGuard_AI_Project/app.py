@@ -99,7 +99,8 @@ with st.sidebar:
 if source == "Full dataset on server":
     import os
 
-    local_csv = "fake_job_postings.csv"
+    from pathlib import Path
+    local_csv = Path(__file__).resolve().parent / "fake_job_postings.csv"
 
     if not os.path.exists(local_csv):
         st.error("Dataset file not found on the server.")
