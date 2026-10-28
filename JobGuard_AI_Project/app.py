@@ -98,27 +98,52 @@ with st.sidebar:
     st.divider()
     st.caption("Libraries: Streamlit, pandas, NumPy, scikit-learn, Matplotlib.")
 
+
 if source == "Built-in demo examples":
     df = get_demo_data()
     data_label = "small illustrative demo set"
 else:
-    if uploaded is None:
-        st.info("Upload a labelled CSV in the sidebar to train the model on your dataset. You can use the built-in demo mode while preparing the dataset.")
-        st.stop()
+    import os
+
+    local_csv = "fake_job_postings.csv"
+
     try:
-        df = pd.read_csv(uploaded)
+        if uploaded is not None:
+            df = pd.read_csv(uploaded)
+            data_label = "uploaded dataset"
+        elif os.path.exists(local_csv):
+            df = pd.read_csv(local_csv)
+            data_label = "full JobGuard AI dataset"
+        else:
+            st.info(
+                "Upload a labelled CSV in the sidebar to use "
+                "your own dataset. Built-in demo mode is also available."
+            )
+            st.stop()
     except Exception as e:
         st.error(f"Could not read CSV: {e}")
         st.stop()
+
     if "fraudulent" not in df.columns:
         st.error("The CSV needs a `fraudulent` column: 0 for legitimate and 1 for fake.")
         st.stop()
-    df["fraudulent"] = pd.to_numeric(df["fraudulent"], errors="coerce")
-    df = df[df["fraudulent"].isin([0,1])].copy()
+
+    df["fraudulent"] = pd.to_numeric(
+        df["fraudulent"], errors="coerce"
+    )
+    df = df[df["fraudulent"].isin([0, 1])].copy()
+
     if len(df) < 10 or df["fraudulent"].nunique() < 2:
-        st.error("Please upload at least 10 labelled rows containing both classes (0 and 1).")
+        st.error(
+            "Please upload at least 10 labelled rows containing both classes (0 and 1)."
+        )
         st.stop()
-    data_label = "uploaded dataset"
+
+    if uploaded is not None:
+        data_label = "uploaded dataset"
+    else:
+        data_label = "full JobGuard AI dataset"
+
 
 texts = combine_fields(df).map(normalize_text)
 labels = df["fraudulent"].astype(int)
